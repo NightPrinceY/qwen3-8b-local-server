@@ -1,10 +1,7 @@
 """
 Islamic queries test against the local vLLM server.
 """
-import time
-from openai import OpenAI
-
-client = OpenAI(base_url="http://localhost:8000/v1", api_key="none")
+from inference import QwenInference
 
 QUERIES = [
     {
@@ -39,45 +36,27 @@ SYSTEM_PROMPT = (
     "Cite sources where possible. Be concise but thorough."
 )
 
-def ask(question: str, max_tokens: int = 600) -> tuple[str, int, float]:
-    start = time.perf_counter()
-    response = client.chat.completions.create(
-        model="qwen3-8b",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": question},
-        ],
-        max_tokens=max_tokens,
-        temperature=0.3,
-    )
-    elapsed = time.perf_counter() - start
-    text = response.choices[0].message.content
-    tokens = response.usage.completion_tokens
-    return text, tokens, elapsed
-
-
 if __name__ == "__main__":
+    llm = QwenInference()
+
     print("=" * 70)
     print("Islamic Knowledge Test — Qwen3-8B-AWQ via vLLM")
     print("=" * 70)
 
     total_tokens, total_time = 0, 0.0
-
     for i, q in enumerate(QUERIES, 1):
         print(f"\n{'─' * 70}")
         print(f"[{i}/{len(QUERIES)}] Category: {q['category']}")
         print(f"Q: {q['question']}")
         print(f"{'─' * 70}")
 
-        text, tokens, elapsed = ask(q["question"])
-        tps = tokens / elapsed
+        result = llm.generate_with_stats(q["question"], system=SYSTEM_PROMPT, max_tokens=600, temperature=0.3)
+        print(f"\n{result['text']}")
+        print(f"\n[{result['tokens']} tokens | {result['elapsed']:.1f}s | {result['tok_per_sec']:.1f} tok/s]")
 
-        print(f"\n{text}")
-        print(f"\n[{tokens} tokens | {elapsed:.1f}s | {tps:.1f} tok/s]")
-
-        total_tokens += tokens
-        total_time += elapsed
+        total_tokens += result["tokens"]
+        total_time += result["elapsed"]
 
     print(f"\n{'=' * 70}")
-    print(f"Total: {total_tokens} tokens | {total_time:.1f}s | Avg {total_tokens/total_time:.1f} tok/s")
+    print(f"Total: {total_tokens} tokens | {total_time:.1f}s | Avg {total_tokens / total_time:.1f} tok/s")
     print("=" * 70)
