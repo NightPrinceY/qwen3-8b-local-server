@@ -45,6 +45,58 @@ python client.py
 python islamic_test.py
 ```
 
+## Inference API
+
+`inference.py` provides a reusable `QwenInference` class for querying the server from any script.
+
+```python
+from inference import QwenInference
+
+llm = QwenInference()
+
+# Simple generation
+text = llm.generate("Explain transformers in 2 sentences.")
+print(text)
+
+# With a system prompt
+text = llm.generate(
+    "What is Zakat?",
+    system="You are a knowledgeable Islamic scholar.",
+    max_tokens=300,
+    temperature=0.3,
+)
+
+# With speed stats
+result = llm.generate_with_stats("Write a Python quicksort.")
+print(result["text"])
+print(f"{result['tok_per_sec']:.1f} tok/s")
+```
+
+### `generate()`
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `prompt` | `str` | required | User message |
+| `system` | `str \| None` | `None` | System prompt |
+| `max_tokens` | `int` | `512` | Max output tokens |
+| `temperature` | `float` | `0.7` | Sampling temperature |
+| `thinking` | `bool` | `False` | Enable Qwen3 chain-of-thought |
+
+Returns `str`.
+
+### `generate_with_stats()`
+
+Same parameters as `generate()`. Returns a `dict`:
+
+```python
+{
+    "text": str,        # model output
+    "tokens": int,      # completion tokens used
+    "elapsed": float,   # wall-clock seconds
+    "tok_per_sec": float
+}
+```
+
 ## Benchmark Results
 
 Tested on 4x RTX 2080 Ti with `--enforce-eager`:
@@ -67,19 +119,15 @@ Key settings in `serve.py`:
 | `--gpu-memory-utilization` | 0.85 | leaves headroom for KV cache |
 | `CUDA_VISIBLE_DEVICES` | 1,3,4,6 | skips occupied GPUs |
 
-## Disabling Qwen3 Thinking Mode
+## Qwen3 Thinking Mode
 
-Qwen3 enables chain-of-thought by default. To disable:
+Qwen3 supports chain-of-thought reasoning. It is **disabled by default** in `inference.py`. To enable it:
 
 ```python
-response = client.chat.completions.create(
-    model="qwen3-8b",
-    messages=[...],
-    extra_body={"chat_template_kwargs": {"enable_thinking": False}},
-)
+result = llm.generate("Solve this step by step: ...", thinking=True)
 ```
 
-Or prepend `/no_think` to your system prompt.
+When enabled, the model outputs a `<think>...</think>` block before the final answer.
 
 ## Environment Variables
 
